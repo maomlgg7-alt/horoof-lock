@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Horoof Lock</title>
+
+<!-- PWA -->
+<link rel="manifest" href="data:application/json,{
+  &quot;name&quot;:&quot;Horoof Lock&quot;,
+  &quot;short_name&quot;:&quot;Horoof&quot;,
+  &quot;start_url&quot;:&quot;.&quot;,
+  &quot;display&quot;:&quot;standalone&quot;,
+  &quot;background_color&quot;:&quot;#000814&quot;,
+  &quot;theme_color&quot;:&quot;#00e5ff&quot;
+}">
+<meta name="theme-color" content="#00e5ff">
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#000814;
+  --card:#001d3d;
+  --accent:#00e5ff;
+  --text:#e0f7ff;
+  --glass:rgba(255,255,255,0.04);
+}
+body{
+  font-family:system-ui,Arial;
+  background:radial-gradient(circle at top,#001d3d,#000814);
+  color:var(--text);
+  min-height:100vh;
+  padding:16px;
+}
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px;
+}
+h1{color:var(--accent)}
+select,button,input,textarea{
+  background:var(--card);
+  border:1px solid rgba(0,229,255,.2);
+  color:var(--text);
+  padding:8px;
+  border-radius:8px;
+}
+button{cursor:pointer}
+main{
+  max-width:900px;
+  margin:auto;
+  display:grid;
+  gap:12px;
+}
+.card{
+  background:var(--glass);
+  border-radius:16px;
+  padding:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.5);
+}
+textarea{
+  width:100%;
+  min-height:140px;
+  resize:vertical;
+}
+.row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.badge{
+  background:rgba(0,229,255,.1);
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:.8rem;
+}
+footer{
+  text-align:center;
+  opacity:.6;
+  margin-top:16px;
+  font-size:.8rem;
+}
+@media(min-width:760px){
+  main{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+
+<body>
+<header>
+  <h1>🔐 Horoof Lock</h1>
+  <div class="row">
+    <select id="uiLang">
+      <option value="ar">العربية</option>
+      <option value="en">English</option>
+      <option value="pt">Português</option>
+    </select>
+    <select id="cipher">
+      <option value="arabic">Arabic</option>
+      <option value="rot13">ROT13</option>
+      <option value="shift1">Shift +1</option>
+      <option value="custom">Custom</option>
+    </select>
+  </div>
+</header>
+
+<main>
+<!-- INPUT -->
+<section class="card">
+  <input id="title" placeholder="عنوان (اختياري)">
+  <textarea id="input" placeholder="النص هنا..."></textarea>
+
+  <div class="row" style="margin-top:8px">
+    <button onclick="encrypt()">🔒 شفر</button>
+    <button onclick="decrypt()">🔓 فك</button>
+    <button onclick="swap()">↔️ تبديل</button>
+    <button onclick="clearAll()">🧹 مسح</button>
+  </div>
+
+  <div class="row" style="margin-top:8px;justify-content:space-between">
+    <span class="badge" id="count">0 حرف</span>
+    <span class="badge" id="stamp">—</span>
+  </div>
+</section>
+
+<!-- OUTPUT -->
+<section class="card">
+  <textarea id="output" placeholder="النتيجة..."></textarea>
+
+  <div class="row" style="margin-top:8px">
+    <button onclick="copyText()">📋 نسخ</button>
+    <button onclick="download()">⬇️ تحميل</button>
+    <button onclick="share()">📤 مشاركة</button>
+  </div>
+
+  <textarea id="customMap" placeholder="خريطة مخصصة
+ا=و
+ب=د
+ت=ط" style="margin-top:10px;min-height:80px"></textarea>
+</section>
+</main>
+
+<footer>© 2025 — مصنوع خصيصًا لمؤمل ❤️</footer>
+
+<script>
+// ===== Direction =====
+const uiLang = document.getElementById('uiLang');
+function updateDir(){
+  document.body.dir = uiLang.value === 'ar' ? 'rtl' : 'ltr';
+}
+uiLang.onchange = updateDir;
+updateDir();
+
+// ===== CIPHERS =====
+const arabic = {"ا":"و","ب":"د","ت":"ط","ث":"ذ","ج":"ز","ح":"خ","خ":"ح","د":"ض","ذ":"ث","ر":"ل","ز":"ج","س":"ش","ش":"س","ص":"ع","ض":"ي","ط":"ف","ظ":"ق","ع":"ص","ف":"ط","ق":"ظ","ك":"0","ل":"1","م":"2","ن":"3","ه":"4","و":"5","ي":"6"};
+const rot13 = {};
+"abcdefghijklmnopqrstuvwxyz".split("").forEach((c,i)=>{
+  rot13[c]="abcdefghijklmnopqrstuvwxyz"[(i+13)%26];
+  rot13[c.toUpperCase()]=rot13[c].toUpperCase();
+});
+const shift1 = {};
+"abcdefghijklmnopqrstuvwxyz".split("").forEach((c,i)=>{
+  shift1[c]="abcdefghijklmnopqrstuvwxyz"[(i+1)%26];
+  shift1[c.toUpperCase()]=shift1[c].toUpperCase();
+});
+
+function getMap(){
+  const type=document.getElementById('cipher').value;
+  if(type==="arabic") return arabic;
+  if(type==="rot13") return rot13;
+  if(type==="shift1") return shift1;
+  const map={};
+  document.getElementById('customMap').value.split(/,|\n/)
+    .forEach(l=>{
+      const[a,b]=l.split('=');
+      if(a&&b) map[a.trim()]=b.trim();
+    });
+  return map;
+}
+
+function apply(text,map,rev){
+  const inv={};
+  if(rev) for(const k in map) if(!(map[k] in inv)) inv[map[k]]=k;
+  return [...text].map(ch=>rev?(inv[ch]??ch):(map[ch]??ch)).join('');
+}
+
+// ===== ACTIONS =====
+const input=document.getElementById('input');
+const output=document.getElementById('output');
+input.oninput=()=>document.getElementById('count').textContent=input.value.length+" حرف";
+
+function stamp(){
+  document.getElementById('stamp').textContent=new Date().toLocaleString();
+}
+
+function encrypt(){
+  output.value=apply(input.value,getMap(),false);
+  stamp();
+}
+function decrypt(){
+  output.value=apply(input.value,getMap(),true);
+  stamp();
+}
+function swap(){
+  [input.value,output.value]=[output.value,input.value];
+}
+function clearAll(){
+  input.value=output.value='';
+}
+function copyText(){
+  navigator.clipboard.writeText(output.value||input.value);
+  alert("تم النسخ ✅");
+}
+function download(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([output.value],{type:'text/plain'}));
+  a.download=(document.getElementById('title').value||"horoof")+".txt";
+  a.click();
+}
+async function share(){
+  if(navigator.share){
+    await navigator.share({text:output.value});
+  }else alert("المتصفح لا يدعم المشاركة");
+}
+
+// ===== Service Worker Inline =====
+if('serviceWorker'in navigator){
+  const swCode=`self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>new Response('Offline')))})`;
+  const blob=new Blob([swCode],{type:'text/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob));
+}
+</script>
+</body>
+</html>
